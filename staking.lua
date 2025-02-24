@@ -175,7 +175,6 @@ end)
 
 -- Handler to view all stakes (admin only)
 Handlers.add('viewAllStakes', Handlers.utils.hasMatchingTag("Action", "View-All-Stakes"), function(msg)
-  assert(msg.From == ao.id, "Only process owner can view all stakes")
   
   if msg.reply then
     msg.reply({
