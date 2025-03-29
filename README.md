@@ -19,3 +19,18 @@ Send({
     Target = "Iod3FVjz3X5hHo8QqnckBdwwNPr9viKeVb6qGsMMYzE",
     Action = "Withdraw",
 })
+
+```lua
+  -- Broadcast using ao.assign with StakerAddresses
+  ao.assign({
+    Targets = StakerAddresses,
+    Action = "Slash-Proposal-Notification",
+    Data = json.encode({
+      proposalId = proposalId,
+      targetAddress = msg.Tags.Target,
+      reason = SlashProposals[proposalId].reason,
+      slashAmount = SlashProposals[proposalId].slashAmount,
+      votingDeadline = msg.Timestamp + Config.VOTING_PERIOD
+    })
+  })
+```
