@@ -455,4 +455,3 @@ Handlers.add('viewAllStakes', Handlers.utils.hasMatchingTag("Action", "View-All-
     })
   end
 end)
-
