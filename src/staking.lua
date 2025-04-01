@@ -95,7 +95,7 @@ Handlers.add('stake',isValidStake, function(msg)
   Send({
       Target = msg.Sender,
       Action = "Stake-Success",
-      Data = json.encode(Stakes[msg.From])
+      Data = json.encode(Stakes[msg.Sender])
     })
 end)
 
@@ -157,7 +157,7 @@ Handlers.add('withdraw', Handlers.utils.hasMatchingTag("Action", "Withdraw"), fu
   
   local sendStake = safeTransfer(msg.From, stakeAmount)
 
-  if sendStake.Action == "Debit-Notice" then
+  if sendStake.success and sendStake.result.Action == "Debit-Notice" then
     -- Reset stake data
     Stakes[msg.From] = {
       amount = "0",
@@ -270,7 +270,12 @@ Handlers.add('finalizeSlashProposal', Handlers.utils.hasMatchingTag("Action", "F
     end
   end
   
-  local yesPercentage = utils.percentage(yesVotes, totalStakedTokens)
+  local yesPercentage
+  if totalStakedTokens == "0" then
+    yesPercentage = "0"
+  else
+    yesPercentage = utils.percentage(yesVotes, totalStakedTokens)
+  end
   local proposalPassed = (
     proposal.voteCount >= SlashConfig.MINIMUM_SLASH_VOTES and
     bint(yesPercentage) >= bint(SlashConfig.QUORUM_PERCENTAGE)
@@ -342,11 +347,8 @@ Handlers.add('viewProposalById', Handlers.utils.hasMatchingTag("Action", "View-P
   end
   
   -- Calculate vote percentages
-  local totalVoteWeight = utils.toNumber(proposal.totalVoteWeight)
   for _, voteDetail in ipairs(detailedProposal.votes.details) do
-    voteDetail.votePercentage = string.format("%.2f", 
-      (utils.toNumber(voteDetail.weight) / totalVoteWeight) * 100
-    )
+    voteDetail.votePercentage = utils.percentage(voteDetail.weight, proposal.totalVoteWeight)
   end
   
   msg.reply({

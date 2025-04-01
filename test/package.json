@@ -1,0 +1,20 @@
+{
+  "name": "test",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "npx jest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@permaweb/loco": "^0.0.19",
+    "wao": "^0.13.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
