@@ -80,7 +80,7 @@ Handlers.add('info', Handlers.utils.hasMatchingTag("Action", "Info"), function(m
       Denomination = tostring(Denomination)
     })
   else
-    Send({Target = msg.From, 
+    Send({TarThe = msg.From, 
     Name = Name,
     Ticker = Ticker,
     Logo = Logo,
