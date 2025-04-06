@@ -134,7 +134,7 @@ Handlers.add('withdraw', Handlers.utils.hasMatchingTag("Action", "Withdraw"), fu
 
   local staked = Stakes[msg.From]
   assert(staked.status == STATUS.IN_COOLDOWN, "unstake first to wirhdraw")
-  assert(msg.Timestamp >= staked.cooldownStart + CooldownPeriod, "Cooldown period not completed")
+  assert(msg.Timestamp >= utils.add(staked.cooldownStart, tostring(CooldownPeriod)), "Cooldown period not completed")
   
   local stakeAmount = staked.amount
 
@@ -178,7 +178,7 @@ Handlers.add('withdraw', Handlers.utils.hasMatchingTag("Action", "Withdraw"), fu
       Action = "Withdraw-Success",
       Data = json.encode({
         amount = stakeAmount,
-        timestamp = ao.time
+        timestamp = msg.Timestamp
       })
     })
     return
