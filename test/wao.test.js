@@ -3,6 +3,7 @@ import { describe, it, before } from "node:test"
 import path from "path"
 import { AO, acc } from "wao/test"
 import fs from 'fs'
+import { pid } from "process"
 
 
 describe("Staking proceess Tests", function () {
@@ -101,6 +102,139 @@ describe("Staking proceess Tests", function () {
         assert.equal(balancesArray[charlie.addr], TestTokenTransfer, "Charlie did not receive the expected tokens")
       } catch (error) {
         console.error(`\x1b[31m${error.message}\x1b[0m`)
+        throw error
+      }
+    })
+  })
+
+  describe("Staking Handler Tests", function () {
+    // Tests for the stake handler
+    it("should successfully stake tokens with valid amount", async () => {
+      try {
+
+        // First, approve the staking contract to spend tokens
+        const stakeAmount = MinimumStake
+
+        // Need to transfer tokens from bob to staking process
+        await tokenProcess.msg("Transfer", {
+          Recipient: stakingPid,
+          Quantity: stakeAmount,
+          "X-Action": "Stake"
+        }, bob)
+
+        // Verify the staking was successful by checking the stake data
+        const bobStakeInfo = (await stakingProcess.v("Stakes"))[bob.addr]
+
+        // Check that the stake was recorded correctly
+        assert.equal(bobStakeInfo.amount, stakeAmount, "\x1b[31mStake amount not recorded correctly\x1b[0m")
+        assert.equal(bobStakeInfo.status, "STAKED", "\x1b[31mStake status should be STAKED\x1b[0m")
+        assert.notEqual(bobStakeInfo.stakeTime, 0, "\x1b[31mStake time should be recorded\x1b[0m")
+
+      } catch (error) {
+        console.error(`\x1b[31mStaking test failed: ${error.message}\x1b[0m`)
+        throw error
+      }
+    })
+
+    it("should fail to stake less than minimum amount", async () => {
+      try {
+        // Create an amount less than minimum
+        const insufficientAmount = "1000000000000" // 1 token, below minimum of 10
+
+        // Attempt to stake an insufficient amount
+        await tokenProcess.msg("Transfer", {
+          Recipient: stakingPid,
+          Quantity: insufficientAmount,
+          "X-Action": "Stake"
+        }, charlie)
+        // const res = await ao.res({ pid: tokenPid, mid })
+        const charlieBalanceResponse = (await tokenProcess.v("Balances"))[charlie.addr]
+        assert.equal(charlieBalanceResponse, TestTokenTransfer, "\x1b[31mStake amount not returned correctly\x1b[0m")
+
+      } catch (error) {
+        console.error(`\x1b[31mTest failed: ${error.message}\x1b[0m`);
+        throw error;
+      }
+    })
+
+    it("should update stake amount when staking more tokens", async () => {
+      try {
+
+        // First, get bob's current stake
+        const initialStakeResult = await stakingProcess.msg("View-Stake", { Target: bob.addr })
+        const initialStake = initialStakeResult.out
+        const initialAmount = initialStake.stake.amount
+
+        // Stake additional tokens
+        const additionalAmount = MinimumStake
+        await tokenProcess.msg("Transfer", {
+          Recipient: stakingPid,
+          Quantity: additionalAmount,
+          "X-Action": "Stake"
+        }, bob)
+
+        // Check that stake was updated correctly
+        const updatedStakeResult = await stakingProcess.msg("View-Stake", { Target: bob.addr })
+        const updatedStake = updatedStakeResult.out
+
+        // Expected amount is initialAmount + additionalAmount
+        const expectedAmount = (BigInt(initialAmount) + BigInt(additionalAmount)).toString()
+
+        assert.equal(updatedStake.stake.amount, expectedAmount, "\x1b[31mStake amount not updated correctly\x1b[0m")
+      } catch (error) {
+        console.error(`\x1b[31mUpdating stake test failed: ${error.message}\x1b[0m`)
+        throw error
+      }
+    })
+
+    it("should allow multiple users to stake tokens", async () => {
+      try {
+        // Alice stakes tokens
+        const stakeAmount = MinimumStake
+        await tokenProcess.msg("Transfer", {
+          Recipient: stakingPid,
+          Quantity: stakeAmount,
+          "X-Action": "Stake"
+        }, alice)
+
+        // Charlie stakes tokens
+        await tokenProcess.msg("Transfer", {
+          Recipient: stakingPid,
+          Quantity: stakeAmount,
+          "X-Action": "Stake"
+        }, charlie)
+
+        // Verify both users have active stakes
+        const aliceStakeResult = await stakingProcess.msg("View-Stake", { Target: alice.addr })
+        const charlieStakeResult = await stakingProcess.msg("View-Stake", { Target: charlie.addr })
+
+        const aliceStake = aliceStakeResult.out
+        const charlieStake = charlieStakeResult.out
+
+        assert.equal(aliceStake.stake.amount, stakeAmount, "\x1b[31mAlice's stake amount incorrect\x1b[0m")
+        assert.equal(charlieStake.stake.amount, stakeAmount, "\x1b[31mCharlie's stake amount incorrect\x1b[0m")
+
+      } catch (error) {
+        console.error(`\x1b[31mMultiple user staking test failed: ${error.message}\x1b[0m`)
+        throw error
+      }
+    })
+
+    it("should allow viewing all stakes", async () => {
+      try {
+
+        // Get all stakes
+        const allStakesResult = await stakingProcess.msg("View-All-Stakes")
+        const allStakes = allStakesResult.out
+
+        // Verify that all three users have stakes
+        assert(allStakes[alice.addr], "\x1b[31mAlice's stake not found\x1b[0m")
+        assert(allStakes[bob.addr], "\x1b[31mBob's stake not found\x1b[0m")
+        assert(allStakes[charlie.addr], "\x1b[31mCharlie's stake not found\x1b[0m")
+
+        console.log("\x1b[32mSuccessfully retrieved all stakes\x1b[0m")
+      } catch (error) {
+        console.error(`\x1b[31mView all stakes test failed: ${error.message}\x1b[0m`)
         throw error
       }
     })

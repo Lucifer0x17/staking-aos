@@ -11,8 +11,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@permaweb/loco": "^0.0.19",
-    "wao": "^0.13.0"
+    "wao": "^0.14.6"
   },
   "devDependencies": {
     "jest": "^29.7.0"

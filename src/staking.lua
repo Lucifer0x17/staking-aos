@@ -79,8 +79,16 @@ end
 Handlers.add('stake',isValidStake, function(msg)
   assert(TokenProcess ~= "", "Token process not set")
   assert(type(msg.Tags.Quantity) == 'string', "Stake quantity required")
-  assert(utils.isGreaterThanOrEqual(msg.Tags.Quantity, MinimumStake), "Stake amount below minimum")
-  
+  if not utils.isGreaterThanOrEqual(msg.Tags.Quantity, MinimumStake) then
+    Send({
+      Target = TokenProcess,
+      Action = "Transfer",
+      Quantity = msg.Tags.Quantity,
+      Recipient = msg.Sender,
+      ['X-Error'] = "Stake amount below minimum"
+    })
+    return
+  end
   initStake(msg.Sender)
   local amount = utils.add(Stakes[msg.Sender].amount or "0", msg.Tags.Quantity)
   
