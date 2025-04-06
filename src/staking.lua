@@ -123,7 +123,7 @@ Handlers.add('unstake', Handlers.utils.hasMatchingTag("Action", "Unstake"), func
         Data = json.encode({
         amount = staked.amount,
         cooldownStart = staked.cooldownStart,
-        withdrawalAvailable = staked.cooldownStart + CooldownPeriod
+        withdrawalAvailable = utils.add(staked.cooldownStart, tostring(CooldownPeriod))
         })
     })
 end)
@@ -425,7 +425,7 @@ Handlers.add('viewStake', Handlers.utils.hasMatchingTag("Action", "View-Stake"),
   local timeRemaining = 0
   
   if stakeInfo.status == STATUS.IN_COOLDOWN then
-    timeRemaining = math.max(0, (stakeInfo.cooldownStart + CooldownPeriod) - ao.time)
+    timeRemaining = math.max(0, (stakeInfo.cooldownStart + CooldownPeriod) - msg.Timestamp)
   end
   
   local response = {
@@ -435,33 +435,17 @@ Handlers.add('viewStake', Handlers.utils.hasMatchingTag("Action", "View-Stake"),
     canWithdraw = timeRemaining == 0 and stakeInfo.status == STATUS.IN_COOLDOWN
   }
   
-  if msg.reply then
     msg.reply({
       Action = "Stake-Info",
       Data = json.encode(response)
     })
-  else
-    Send({
-      Target = msg.From,
-      Action = "Stake-Info",
-      Data = json.encode(response)
-    })
-  end
 end)
 
 -- Handler to view all stakes (admin only)
 Handlers.add('viewAllStakes', Handlers.utils.hasMatchingTag("Action", "View-All-Stakes"), function(msg)
   
-  if msg.reply then
     msg.reply({
       Action = "All-Stakes",
       Data = json.encode(Stakes)
     })
-  else
-    Send({
-      Target = msg.From,
-      Action = "All-Stakes",
-      Data = json.encode(Stakes)
-    })
-  end
 end)

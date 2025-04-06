@@ -3,7 +3,6 @@ import { describe, it, before } from "node:test"
 import path from "path"
 import { AO, acc } from "wao/test"
 import fs from 'fs'
-import { pid } from "process"
 
 
 describe("Staking proceess Tests", function () {
@@ -27,6 +26,8 @@ describe("Staking proceess Tests", function () {
       alice = acc[0]
       bob = acc[1]
       charlie = acc[2]
+
+
 
       // Read process source code
       const srcDir = path.resolve(".", "..", "src")
@@ -116,11 +117,11 @@ describe("Staking proceess Tests", function () {
         const stakeAmount = MinimumStake
 
         // Need to transfer tokens from bob to staking process
-        await tokenProcess.msg("Transfer", {
+        const msg = await tokenProcess.msg("Transfer", {
           Recipient: stakingPid,
           Quantity: stakeAmount,
           "X-Action": "Stake"
-        }, bob)
+        }, { jwk: bob.jwk })
 
         // Verify the staking was successful by checking the stake data
         const bobStakeInfo = (await stakingProcess.v("Stakes"))[bob.addr]
@@ -142,14 +143,14 @@ describe("Staking proceess Tests", function () {
         const insufficientAmount = "1000000000000" // 1 token, below minimum of 10
 
         // Attempt to stake an insufficient amount
-        await tokenProcess.msg("Transfer", {
+        const { mid } = await tokenProcess.msg("Transfer", {
           Recipient: stakingPid,
           Quantity: insufficientAmount,
           "X-Action": "Stake"
-        }, charlie)
-        // const res = await ao.res({ pid: tokenPid, mid })
-        const charlieBalanceResponse = (await tokenProcess.v("Balances"))[charlie.addr]
-        assert.equal(charlieBalanceResponse, TestTokenTransfer, "\x1b[31mStake amount not returned correctly\x1b[0m")
+        }, { jwk: charlie.jwk })
+        const { out } = await tokenProcess.res({ mid, get: ["Quantity", "Action"] })
+        assert.equal(out.Quantity, insufficientAmount.toString(), "\x1b[31mStake amount not returned correctly\x1b[0m")
+        assert.equal(out.Action, "Debit-Notice", "\x1b[31mWrong tag is sending the money\x1b[0m")
 
       } catch (error) {
         console.error(`\x1b[31mTest failed: ${error.message}\x1b[0m`);
@@ -171,7 +172,7 @@ describe("Staking proceess Tests", function () {
           Recipient: stakingPid,
           Quantity: additionalAmount,
           "X-Action": "Stake"
-        }, bob)
+        }, { jwk: bob.jwk })
 
         // Check that stake was updated correctly
         const updatedStakeResult = await stakingProcess.msg("View-Stake", { Target: bob.addr })
@@ -195,14 +196,14 @@ describe("Staking proceess Tests", function () {
           Recipient: stakingPid,
           Quantity: stakeAmount,
           "X-Action": "Stake"
-        }, alice)
+        }, { jwk: alice.jwk })
 
         // Charlie stakes tokens
         await tokenProcess.msg("Transfer", {
           Recipient: stakingPid,
           Quantity: stakeAmount,
           "X-Action": "Stake"
-        }, charlie)
+        }, { jwk: charlie.jwk })
 
         // Verify both users have active stakes
         const aliceStakeResult = await stakingProcess.msg("View-Stake", { Target: alice.addr })
@@ -231,10 +232,80 @@ describe("Staking proceess Tests", function () {
         assert(allStakes[alice.addr], "\x1b[31mAlice's stake not found\x1b[0m")
         assert(allStakes[bob.addr], "\x1b[31mBob's stake not found\x1b[0m")
         assert(allStakes[charlie.addr], "\x1b[31mCharlie's stake not found\x1b[0m")
-
-        console.log("\x1b[32mSuccessfully retrieved all stakes\x1b[0m")
       } catch (error) {
         console.error(`\x1b[31mView all stakes test failed: ${error.message}\x1b[0m`)
+        throw error
+      }
+    })
+  })
+
+  describe("Unstake Handler Tests", function () {
+    it("should successfully initiate unstake and start cooldown", async () => {
+      try {
+
+        // First verify bob has an active stake
+        const initialStakeResult = await stakingProcess.msg("View-Stake", { Target: bob.addr })
+        const initialStake = initialStakeResult.out
+        assert.equal(initialStake.stake.status, "STAKED", "\x1b[31mBob's stake should be active before unstaking\x1b[0m")
+        // Initiate unstake
+        const { out: unstakeResult } = await stakingProcess.msg("Unstake", {}, { get: { Data: { data: true, json: true }, Action: "Action" }, jwk: bob.jwk })
+
+        // Verify the response data
+        assert(unstakeResult.Data, "\x1b[31mUnstake response should contain data\x1b[0m")
+        assert(unstakeResult.Action === "Unstake-Initiated", "\x1b[31mAction should be Unstake-Initiated\x1b[0m")
+
+        // Verify cooldown has started
+        const updatedStakeResult = await stakingProcess.msg("View-Stake", { Target: bob.addr })
+        const updatedStake = updatedStakeResult.out
+
+        assert.equal(updatedStake.stake.status, "IN_COOLDOWN", "\x1b[31mStake status should be IN_COOLDOWN\x1b[0m")
+        assert.notEqual(updatedStake.stake.cooldownStart, 0, "\x1b[31mCooldown start time should be recorded\x1b[0m")
+
+      } catch (error) {
+        console.error(`\x1b[31mUnstake test failed: ${error.message}\x1b[0m`)
+        throw error
+      }
+    })
+
+    it("should fail to unstake when there is no active stake", async () => {
+      try {
+        const ar = ao.ar
+        const { jwk } = await ar.gen("1")
+
+        // Attempt to unstake with no active stake
+        const { res } = await stakingProcess.msg("Unstake", { jwk: jwk })
+        assert(res.Error.includes("No active stake found"), "\x1b[31mUnstake response should contain error\x1b[0m")
+
+      } catch (error) {
+        console.error(`\x1b[31mTest failed: ${error.message}\x1b[0m`)
+        throw error
+      }
+    })
+
+    it("should fail to unstake again when already in cooldown", async () => {
+      try {
+        // Attempt to unstake with no active stake
+        const { res } = await stakingProcess.msg("Unstake", { jwk: bob.jwk })
+        assert(res.Error.includes("Stake is already in cooldown"), "\x1b[31mUnstake response should contain error\x1b[0m")
+
+      } catch (error) {
+        console.error(`\x1b[31mTest failed: ${error.message}\x1b[0m`)
+        throw error
+      }
+    })
+
+    it("should show correct time remaining for cooldown", async () => {
+      try {
+
+        // Get bob's stake with cooldown info
+        const stakeResult = await stakingProcess.msg("View-Stake", { Target: bob.addr })
+        const stake = stakeResult.out
+        // Verify cooldown period is set correctly
+        assert(stake.timeRemaining > 0, "\x1b[31mCooldown time remaining should be greater than 0\x1b[0m")
+        assert.equal(stake.canWithdraw, false, "\x1b[31mShould not be able to withdraw yet\x1b[0m")
+
+      } catch (error) {
+        console.error(`\x1b[31mTest failed: ${error.message}\x1b[0m`)
         throw error
       }
     })
