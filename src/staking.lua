@@ -34,7 +34,7 @@ CooldownPeriod = CooldownPeriod or 30 * 24 * 60 * 60 -- 30 days in seconds
 MinimumStake = MinimumStake or utils.toBalanceValue(10 * 10 ^ 12) -- 10 tokens minimum
 
 -- Slash Voting Configuration
-local SlashConfig = {
+SlashConfig = {
   VOTING_PERIOD = 7 * 24 * 60 * 60,  -- 7 days
   QUORUM_PERCENTAGE = 50,  -- 50% of total staked tokens must vote
   SLASH_PERCENTAGE = 20,   -- 20% of staked tokens can be slashed
@@ -42,14 +42,14 @@ local SlashConfig = {
 }
 
 -- Slash Proposal Status
-local PROPOSAL_STATUS = {
+PROPOSAL_STATUS = {
   OPEN = "OPEN",
   FAILED = "FAILED",
   EXECUTED = "EXECUTED"
 }
 
 -- Status constants
-local STATUS = {
+STATUS = {
   STAKED = "STAKED",
   IN_COOLDOWN = "IN_COOLDOWN"
 }
@@ -285,15 +285,14 @@ Handlers.add('finalizeSlashProposal', Handlers.utils.hasMatchingTag("Action", "F
     yesPercentage = utils.percentage(yesVotes, totalStakedTokens)
   end
   local proposalPassed = (
-    proposal.voteCount >= SlashConfig.MINIMUM_SLASH_VOTES and
-    bint(yesPercentage) >= bint(SlashConfig.QUORUM_PERCENTAGE)
+    tonumber(proposal.voteCount) >= tonumber(SlashConfig.MINIMUM_SLASH_VOTES) and
+    tonumber(yesPercentage) >= tonumber(SlashConfig.QUORUM_PERCENTAGE)
   )
   
   if proposalPassed then
     -- Execute slashing
     local targetStake = Stakes[proposal.targetAddress]
-    local slashAmount = utils.multiply(targetStake.amount, tostring(SlashConfig.SLASH_PERCENTAGE / 100))
-    
+    local slashAmount = (tonumber(targetStake.amount)* tonumber(SlashConfig.SLASH_PERCENTAGE)) / tonumber(100)
     -- Reduce stake
     targetStake.amount = utils.subtract(targetStake.amount, slashAmount)
     proposal.status = PROPOSAL_STATUS.EXECUTED
@@ -303,6 +302,7 @@ Handlers.add('finalizeSlashProposal', Handlers.utils.hasMatchingTag("Action", "F
       Action = "Stake-Slashed",
       Data = json.encode({
         amount = slashAmount,
+        proposalId = msg.Tags.ProposalId,
         reason = proposal.reason
       })
     })
