@@ -259,7 +259,7 @@ Handlers.add('finalizeSlashProposal', Handlers.utils.hasMatchingTag("Action", "F
   local proposal = SlashProposals[msg.Tags.ProposalId]
   assert(proposal, "Proposal does not exist")
   assert(proposal.status == PROPOSAL_STATUS.OPEN, "Proposal already finalized")
-  assert(msg.Timestamp >= proposal.createdAt + SlashConfig.VOTING_PERIOD, "Voting period not yet complete")
+  assert(msg.Timestamp >= utils.add(proposal.createdAt, tostring(SlashConfig.VOTING_PERIOD)), "Voting period not yet complete")
   
   -- Calculate total staked tokens
   local totalStakedTokens = "0"
